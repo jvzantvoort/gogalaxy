@@ -68,7 +68,8 @@ dockers_v2:
       - gogalaxy.example.yaml
 
 snapshot:
-  version_template: "{{ incpatch .Version }}-next+{{ .ShortCommit }}"
+  # No "+": snapshot versions are also used as container tags.
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
 
 changelog:
   # Used for manually pushed tags. Releases cut by release-please keep their
