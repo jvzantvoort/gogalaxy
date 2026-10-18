@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/jvzantvoort/gogalaxy/compare/v0.1.1...v0.1.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* serve collection index paths like pulp_ansible ([c91845b](https://github.com/jvzantvoort/gogalaxy/commit/c91845ba36cc79d91179636ef56d580a2df3d382))
+
+
+### Performance
+
+* in-memory collection index for browsing and search ([5da8cc4](https://github.com/jvzantvoort/gogalaxy/commit/5da8cc40dafc28d3efa09a91f39b7b2131f0627f))
+
 ## [0.1.1](https://github.com/jvzantvoort/gogalaxy/compare/v0.1.0...v0.1.1) (2026-10-18)
 
 
