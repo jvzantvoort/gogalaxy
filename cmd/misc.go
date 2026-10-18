@@ -51,7 +51,7 @@ func toYAML(c *config.Config) map[string]any {
 			"shutdown_timeout": c.Server.ShutdownTimeout.String(), "secret_key": c.Server.SecretKey,
 		},
 		"api":     map[string]any{"prefix": c.API.Prefix, "reported_version": c.ReportedVersion(version.GalaxyNGCompat)},
-		"storage": map[string]any{"driver": c.Storage.Driver, "path": c.Storage.Path, "options": c.Storage.Options},
+		"storage": map[string]any{"driver": c.Storage.Driver, "path": c.Storage.Path, "index": c.Storage.Index, "options": c.Storage.Options},
 		"content": map[string]any{
 			"repositories": c.Content.Repositories, "default_repository": c.Content.DefaultRepository,
 			"upload_repository": c.Content.UploadRepository, "auto_create_namespaces": c.Content.AutoCreateNamespaces,

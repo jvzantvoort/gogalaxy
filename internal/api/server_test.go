@@ -25,6 +25,7 @@ import (
 	"github.com/jvzantvoort/gogalaxy/internal/model"
 	"github.com/jvzantvoort/gogalaxy/internal/service"
 	"github.com/jvzantvoort/gogalaxy/internal/storage"
+	"github.com/jvzantvoort/gogalaxy/internal/storage/cache"
 	_ "github.com/jvzantvoort/gogalaxy/internal/storage/file"
 	"github.com/jvzantvoort/gogalaxy/internal/testutil"
 )
@@ -51,6 +52,9 @@ func newEnv(t *testing.T, settings map[string]any) *env {
 	store, err := storage.Open(cfg.Storage)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if cfg.Storage.Index {
+		store, _ = cache.Wrap(store)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := service.New(cfg, store, nil, log)
@@ -151,7 +155,13 @@ func TestRoot(t *testing.T) {
 }
 
 func TestCollectionLifecycle(t *testing.T) {
-	e := newEnv(t, nil)
+	for _, index := range []bool{true, false} {
+		t.Run(fmt.Sprintf("index=%t", index), func(t *testing.T) { testCollectionLifecycle(t, index) })
+	}
+}
+
+func testCollectionLifecycle(t *testing.T, index bool) {
+	e := newEnv(t, map[string]any{"storage.index": index})
 	art := testutil.Collection(t, "testns", "demo", "1.0.0", map[string]string{"other.dep": ">=1.0.0"})
 
 	if code, _ := e.publish("", "testns-demo-1.0.0.tar.gz", art); code != 401 {

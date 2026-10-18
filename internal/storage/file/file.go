@@ -6,6 +6,7 @@
 //	<path>/namespaces/<name>.json
 //	<path>/repositories/<repo>/<namespace>/<name>/collection.json
 //	<path>/repositories/<repo>/<namespace>/<name>/versions/<version>.json
+//	<path>/repositories/.generation           (changes on every collection write)
 //	<path>/roles/<namespace>/<name>.json
 //	<path>/roles/.index/<id>                  (role ID -> "<namespace>/<name>")
 //	<path>/tasks/<id>.json

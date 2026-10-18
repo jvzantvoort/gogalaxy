@@ -14,7 +14,6 @@ import (
 
 	"github.com/jvzantvoort/gogalaxy/internal/importer"
 	"github.com/jvzantvoort/gogalaxy/internal/model"
-	"github.com/jvzantvoort/gogalaxy/internal/semver"
 	"github.com/jvzantvoort/gogalaxy/internal/storage"
 )
 
@@ -248,15 +247,49 @@ func (s *Service) GetVersion(ctx context.Context, u *model.User, repo, namespace
 // pre-release when no stable version exists. versions must be sorted
 // highest first.
 func HighestVersion(versions []*model.CollectionVersion) *model.CollectionVersion {
-	for _, v := range versions {
-		if p, err := semver.Parse(v.Version); err == nil && !p.IsPrerelease() {
-			return v
+	return model.HighestVersion(versions)
+}
+
+// SearchVersions returns the versions in repos matching match. It uses the
+// store's CollectionSearcher when available and scans otherwise.
+func (s *Service) SearchVersions(ctx context.Context, u *model.User, repos []string,
+	match func(repo string, hit storage.SearchHit) bool) (map[string][]storage.SearchHit, error) {
+	if err := s.requireRead(u); err != nil {
+		return nil, err
+	}
+	cs := s.Store.Collections()
+	out := map[string][]storage.SearchHit{}
+	for _, repo := range repos {
+		if err := s.checkRepo(repo); err != nil {
+			return nil, err
+		}
+		pred := func(h storage.SearchHit) bool { return match(repo, h) }
+		if searcher, ok := cs.(storage.CollectionSearcher); ok {
+			hits, err := searcher.Search(ctx, repo, pred)
+			if err != nil {
+				return nil, err
+			}
+			out[repo] = hits
+			continue
+		}
+		cols, err := cs.ListCollections(ctx, repo)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range cols {
+			versions, err := cs.ListVersions(ctx, repo, c.Namespace, c.Name)
+			if err != nil {
+				return nil, err
+			}
+			highest := model.HighestVersion(versions)
+			for _, v := range versions {
+				if h := (storage.SearchHit{Collection: c, Version: v, Highest: v == highest}); pred(h) {
+					out[repo] = append(out[repo], h)
+				}
+			}
 		}
 	}
-	if len(versions) > 0 {
-		return versions[0]
-	}
-	return nil
+	return out, nil
 }
 
 // SetDeprecated marks a collection as (not) deprecated.

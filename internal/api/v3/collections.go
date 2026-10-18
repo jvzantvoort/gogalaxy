@@ -13,6 +13,7 @@ import (
 	"github.com/jvzantvoort/gogalaxy/internal/auth"
 	"github.com/jvzantvoort/gogalaxy/internal/model"
 	"github.com/jvzantvoort/gogalaxy/internal/service"
+	"github.com/jvzantvoort/gogalaxy/internal/storage"
 )
 
 func (a *API) collectionJSON(repo string, c *model.Collection, versions []*model.CollectionVersion) map[string]any {
@@ -259,44 +260,37 @@ func (a *API) search(w http.ResponseWriter, r *http.Request) {
 		keywords = strings.ToLower(q.Get("q"))
 	}
 
-	var out []map[string]any
-	for _, repo := range repos {
-		cols, err := a.svc.Store.Collections().ListCollections(ctx, repo)
-		if err != nil {
-			httpx.V3Fail(w, r, err)
-			return
+	ns, name, deprecated := q.Get("namespace"), q.Get("name"), q.Get("is_deprecated")
+	wantDeprecated, _ := strconv.ParseBool(deprecated)
+	byRepo, err := a.svc.SearchVersions(ctx, u, repos, func(_ string, h storage.SearchHit) bool {
+		c := h.Collection
+		switch {
+		case ns != "" && c.Namespace != ns,
+			name != "" && c.Name != name,
+			deprecated != "" && c.Deprecated != wantDeprecated:
+			return false
 		}
-		for _, c := range cols {
-			if ns := q.Get("namespace"); ns != "" && c.Namespace != ns {
-				continue
-			}
-			if n := q.Get("name"); n != "" && c.Name != n {
-				continue
-			}
-			if d := q.Get("is_deprecated"); d != "" {
-				if want, _ := strconv.ParseBool(d); want != c.Deprecated {
-					continue
-				}
-			}
-			versions, err := a.svc.Store.Collections().ListVersions(ctx, repo, c.Namespace, c.Name)
-			if err != nil {
-				httpx.V3Fail(w, r, err)
-				return
-			}
-			highest := service.HighestVersion(versions)
-			for _, v := range versions {
-				if !matchSearch(q, keywords, v, v == highest) {
-					continue
-				}
-				out = append(out, a.searchItem(repo, c, v, v == highest))
-			}
+		return matchSearch(q, keywords, h.Version, h.Highest)
+	})
+	if err != nil {
+		httpx.V3Fail(w, r, err)
+		return
+	}
+	type hit struct {
+		repo string
+		storage.SearchHit
+	}
+	var hits []hit
+	for _, repo := range repos {
+		for _, h := range byRepo[repo] {
+			hits = append(hits, hit{repo, h})
 		}
 	}
-	p := httpx.LimitOffset(r, len(out))
+	p := httpx.LimitOffset(r, len(hits))
 	lo, hi := p.Slice()
-	page := out[lo:hi]
-	if page == nil {
-		page = []map[string]any{}
+	page := make([]map[string]any, 0, hi-lo)
+	for _, h := range hits[lo:hi] {
+		page = append(page, a.searchItem(h.repo, h.Collection, h.Version, h.Highest))
 	}
 	httpx.V3List(w, r, p, page)
 }

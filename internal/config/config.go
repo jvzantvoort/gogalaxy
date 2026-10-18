@@ -59,6 +59,9 @@ type APIConfig struct {
 type StorageConfig struct {
 	Driver string `mapstructure:"driver"`
 	Path   string `mapstructure:"path"`
+	// Index keeps an in-memory collection index in the server, for drivers
+	// that support change tracking.
+	Index bool `mapstructure:"index"`
 	// Options carries driver specific settings.
 	Options map[string]any `mapstructure:"options"`
 }
@@ -111,6 +114,7 @@ func SetDefaults(v *viper.Viper) {
 
 	v.SetDefault("storage.driver", "file")
 	v.SetDefault("storage.path", "./data")
+	v.SetDefault("storage.index", true)
 
 	v.SetDefault("content.repositories", []string{"published"})
 	v.SetDefault("content.default_repository", "published")

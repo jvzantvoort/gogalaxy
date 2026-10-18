@@ -4,6 +4,8 @@ package model
 import (
 	"slices"
 	"time"
+
+	"github.com/jvzantvoort/gogalaxy/internal/semver"
 )
 
 // User is a local account.
@@ -81,6 +83,21 @@ type CollectionVersion struct {
 	Uploader        string             `json:"uploader,omitempty"`
 	Created         time.Time          `json:"created"`
 	Modified        time.Time          `json:"modified"`
+}
+
+// HighestVersion returns the highest stable version, or the highest
+// pre-release when no stable version exists, like pulp_ansible's
+// highest_version. versions must be sorted highest first.
+func HighestVersion(versions []*CollectionVersion) *CollectionVersion {
+	for _, v := range versions {
+		if p, err := semver.Parse(v.Version); err == nil && !p.IsPrerelease() {
+			return v
+		}
+	}
+	if len(versions) > 0 {
+		return versions[0]
+	}
+	return nil
 }
 
 // FQCN returns namespace.name.

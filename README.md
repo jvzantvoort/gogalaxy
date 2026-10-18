@@ -143,6 +143,7 @@ data/tokens/<sha256 of token>.json
 data/namespaces/<name>.json
 data/repositories/<repo>/<namespace>/<name>/collection.json
 data/repositories/<repo>/<namespace>/<name>/versions/<version>.json
+data/repositories/.generation          (token that changes on every collection write)
 data/roles/<namespace>/<name>.json
 data/roles/.index/<id>                 (role ID -> namespace/name, rebuilt on demand)
 data/tasks/<id>.json
@@ -151,5 +152,12 @@ data/artifacts/{collections,roles}/<file>.tar.gz
 
 Writes are atomic (temporary file + rename), so reads take no lock; writes
 are serialised within one process. Role download counts are buffered in
-memory and written every 10 seconds and on shutdown. Running two servers on
+memory and written every 10 seconds and on shutdown.
+
+`serve` keeps an in-memory index of collections (`storage.index`, on by
+default) for browsing, search and version lookups. Every collection write,
+from the server or a CLI command, changes `repositories/.generation`, and the
+index rebuilds the affected repository on the next request, so changes are
+visible immediately. If you modify the data directory by other means (restore
+a backup, rsync), restart the server. Running two servers on
 the same directory at once is not supported.

@@ -122,6 +122,30 @@ type ArtifactStore interface {
 	Delete(ctx context.Context, kind, filename string) error
 }
 
+// ChangeTracker is optionally implemented by a Store that can cheaply report
+// whether collection data changed, including changes made by other processes
+// (e.g. CLI commands writing to the same storage). The token is opaque: any
+// difference from a previously returned value means "changed".
+type ChangeTracker interface {
+	CollectionsGeneration(ctx context.Context) (string, error)
+}
+
+// SearchHit is a collection version matched by CollectionSearcher.Search.
+type SearchHit struct {
+	Collection *model.Collection
+	Version    *model.CollectionVersion
+	// Highest reports whether Version is the collection's highest version
+	// (see model.HighestVersion).
+	Highest bool
+}
+
+// CollectionSearcher is optionally implemented by a CollectionStore that can
+// filter versions without materialising a whole repository. match receives
+// shared values that must not be modified; returned hits are copies.
+type CollectionSearcher interface {
+	Search(ctx context.Context, repo string, match func(SearchHit) bool) ([]SearchHit, error)
+}
+
 // Factory creates a Store from configuration.
 type Factory func(cfg config.StorageConfig) (Store, error)
 

@@ -2,6 +2,8 @@ package file
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -17,6 +19,32 @@ import (
 )
 
 type collections struct{ s *Store }
+
+func (s *Store) generationPath() string { return filepath.Join(s.root, "repositories", ".generation") }
+
+// bump records that collection data changed by writing a new random token.
+// It runs after every collection write, from any process, so readers in other
+// processes (the server's index) notice CLI changes. Callers hold s.mu.
+func (c collections) bump() {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	if err := writeAtomic(c.s.generationPath(), func(w io.Writer) error {
+		_, err := io.WriteString(w, hex.EncodeToString(b))
+		return err
+	}); err != nil {
+		// Without a new token cached readers could serve stale data.
+		_ = os.Remove(c.s.generationPath())
+	}
+}
+
+// CollectionsGeneration implements storage.ChangeTracker.
+func (s *Store) CollectionsGeneration(_ context.Context) (string, error) {
+	b, err := os.ReadFile(s.generationPath())
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+	return string(b), err
+}
 
 func (c collections) ListCollections(_ context.Context, repo string) ([]*model.Collection, error) {
 	base, err := c.s.path("repositories", repo)
@@ -68,6 +96,7 @@ func (c collections) GetCollection(_ context.Context, repo, namespace, name stri
 func (c collections) UpdateCollection(_ context.Context, repo string, col *model.Collection) error {
 	c.s.mu.Lock()
 	defer c.s.mu.Unlock()
+	defer c.bump()
 	p, err := c.s.path("repositories", repo, col.Namespace, col.Name, "collection.json")
 	if err != nil {
 		return err
@@ -107,6 +136,7 @@ func (c collections) GetVersion(_ context.Context, repo, namespace, name, versio
 func (c collections) CreateVersion(_ context.Context, repo string, cv *model.CollectionVersion) error {
 	c.s.mu.Lock()
 	defer c.s.mu.Unlock()
+	defer c.bump()
 	vp, err := c.s.path("repositories", repo, cv.Namespace, cv.Name, "versions", cv.Version+".json")
 	if err != nil {
 		return err
@@ -133,6 +163,7 @@ func (c collections) CreateVersion(_ context.Context, repo string, cv *model.Col
 func (c collections) DeleteVersion(_ context.Context, repo, namespace, name, version string) error {
 	c.s.mu.Lock()
 	defer c.s.mu.Unlock()
+	defer c.bump()
 	vp, err := c.s.path("repositories", repo, namespace, name, "versions", version+".json")
 	if err != nil {
 		return storage.ErrNotFound

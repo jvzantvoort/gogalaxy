@@ -13,6 +13,8 @@ import (
 
 	"github.com/jvzantvoort/gogalaxy/internal/api"
 	"github.com/jvzantvoort/gogalaxy/internal/auth"
+	"github.com/jvzantvoort/gogalaxy/internal/service"
+	"github.com/jvzantvoort/gogalaxy/internal/storage/cache"
 	"github.com/jvzantvoort/gogalaxy/internal/version"
 )
 
@@ -26,6 +28,15 @@ var serveCmd = &cobra.Command{
 			return err
 		}
 		defer a.Close()
+
+		if a.cfg.Storage.Index {
+			if store, ok := cache.Wrap(a.store); ok {
+				a.store, a.svc = store, service.New(a.cfg, store, nil, a.log)
+			} else {
+				a.log.Warn("storage driver does not support change tracking; collection index disabled",
+					"driver", a.cfg.Storage.Driver)
+			}
+		}
 
 		chain, err := auth.Build(a.cfg.Auth.Backends, a.store, a.cfg.Auth.Options)
 		if err != nil {

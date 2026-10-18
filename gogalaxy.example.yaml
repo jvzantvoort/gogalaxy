@@ -26,6 +26,9 @@ api:
 storage:
   driver: file
   path: ./data
+  # Keep an in-memory collection index in the server for fast browsing and
+  # search. It notices changes made by CLI commands automatically.
+  index: true
 
 content:
   # Collection repositories (galaxy_ng distributions). Each one is reachable
