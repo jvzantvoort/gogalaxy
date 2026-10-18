@@ -61,7 +61,13 @@ func NewHandler(o Options) http.Handler {
 	r.Get(prefix+"/api/", redirect(prefix+"/"))
 	r.Get(prefix+"/content/{repo}/", h.apiRoot)
 	r.Get(prefix+"/content/{repo}/api/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, prefix+"/content/"+chi.URLParam(r, "repo")+"/", http.StatusTemporaryRedirect)
+		repo := chi.URLParam(r, "repo")
+		if !cfg.HasRepository(repo) {
+			httpx.V3Error(w, http.StatusNotFound, "not_found", "Not found.", "")
+			return
+		}
+		// Local path built from a configured repository name.
+		http.Redirect(w, r, prefix+"/content/"+repo+"/", http.StatusTemporaryRedirect) //nolint:gosec // see above
 	})
 
 	// Execution environments are not hosted.
@@ -105,13 +111,15 @@ func redirect(to string) http.HandlerFunc {
 // route when it exists, mirroring Django's APPEND_SLASH.
 func appendSlash(mux *chi.Mux) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !strings.HasSuffix(r.URL.Path, "/") {
+		// Paths starting with "//" would become protocol relative (off-site) redirects.
+		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !strings.HasSuffix(r.URL.Path, "/") &&
+			!strings.HasPrefix(r.URL.Path, "//") {
 			if mux.Match(chi.NewRouteContext(), r.Method, r.URL.Path+"/") {
 				target := r.URL.Path + "/"
 				if r.URL.RawQuery != "" {
 					target += "?" + r.URL.RawQuery
 				}
-				http.Redirect(w, r, target, http.StatusMovedPermanently)
+				http.Redirect(w, r, target, http.StatusMovedPermanently) //nolint:gosec // local path, "//" excluded above
 				return
 			}
 		}

@@ -214,7 +214,7 @@ func TestCollectionLifecycle(t *testing.T) {
 	}
 	got, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != 200 || !bytes.Equal(got, art) {
+	if resp.StatusCode != http.StatusOK || !bytes.Equal(got, art) {
 		t.Fatalf("download: %d, %d bytes", resp.StatusCode, len(got))
 	}
 
@@ -256,7 +256,7 @@ func TestInvalidCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode != 401 || resp.Header.Get("WWW-Authenticate") == "" {
+	if resp.StatusCode != http.StatusUnauthorized || resp.Header.Get("WWW-Authenticate") == "" {
 		t.Fatalf("status %d, challenge %q", resp.StatusCode, resp.Header.Get("WWW-Authenticate"))
 	}
 	req, _ = http.NewRequest(http.MethodPost, e.srv.URL+"/api/galaxy/v3/auth/token/", nil)
@@ -313,7 +313,7 @@ func TestRoles(t *testing.T) {
 			}
 			got, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			if resp.StatusCode != 200 || !bytes.Equal(got, archive) {
+			if resp.StatusCode != http.StatusOK || !bytes.Equal(got, archive) {
 				t.Fatalf("download: %d", resp.StatusCode)
 			}
 			if !anon {
@@ -322,7 +322,7 @@ func TestRoles(t *testing.T) {
 					t.Fatal(err)
 				}
 				resp.Body.Close()
-				if resp.StatusCode != 401 {
+				if resp.StatusCode != http.StatusUnauthorized {
 					t.Fatalf("unsigned download: %d", resp.StatusCode)
 				}
 			}

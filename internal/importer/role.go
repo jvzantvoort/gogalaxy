@@ -172,7 +172,8 @@ func PackDir(dir, prefix string, w io.Writer) error {
 		if info.IsDir() {
 			return nil
 		}
-		f, err := os.Open(p)
+		// dir is a local directory chosen by the CLI operator, not untrusted input.
+		f, err := os.Open(p) //nolint:gosec // see above
 		if err != nil {
 			return err
 		}

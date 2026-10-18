@@ -1,0 +1,9 @@
+# Build output
+/gogalaxy
+/gogalaxy.exe
+/dist/
+coverage.out
+
+# Runtime data and local configuration
+/data/
+/gogalaxy.yaml

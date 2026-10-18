@@ -71,6 +71,9 @@ var versionCmd = &cobra.Command{
 		if version.Commit != "" {
 			fmt.Printf(" (%s)", version.Commit)
 		}
+		if version.Date != "" {
+			fmt.Printf(" built %s", version.Date)
+		}
 		fmt.Printf("\ngalaxy_ng API compatibility: %s\n", version.GalaxyNGCompat)
 		fmt.Printf("storage drivers: %v\nauth backends: %v\n", storage.Drivers(), auth.Backends())
 	},

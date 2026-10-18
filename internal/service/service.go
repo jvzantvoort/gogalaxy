@@ -98,15 +98,5 @@ func (s *Service) requirePublish(u *model.User, ns *model.Namespace) error {
 	return nil
 }
 
-func (s *Service) requireAdmin(u *model.User) error {
-	if u == nil {
-		return newErr(KindUnauthorized, "Authentication credentials were not provided.")
-	}
-	if !s.Policy.IsAdmin(u) {
-		return newErr(KindForbidden, "You do not have permission to perform this action.")
-	}
-	return nil
-}
-
 // CanRead reports whether u may read content.
 func (s *Service) CanRead(ctx context.Context, u *model.User) error { return s.requireRead(u) }

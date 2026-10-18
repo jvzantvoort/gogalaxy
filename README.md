@@ -103,6 +103,38 @@ internal/api            router; v3 (collections), v1 (roles), ee (execution envi
   instead of the default owner based policy.
 * **API**: add a package under `internal/api` and mount it in `api.NewHandler`.
 
+## Development and releases
+
+```sh
+make build lint test     # what CI runs, roughly
+make snapshot            # local dry run of a release (all platforms, nothing published)
+make docker              # local container image (docker or podman)
+```
+
+GitHub Actions:
+
+* **CI** (`.github/workflows/ci.yml`, every push and PR): `go mod tidy` check,
+  golangci-lint, race tests with coverage on the go.mod and stable Go
+  versions, govulncheck, and a GoReleaser snapshot build of all binaries and
+  the container image. PR titles must follow
+  [Conventional Commits](https://www.conventionalcommits.org/).
+* **Release** (`.github/workflows/release.yml`): versions come from the
+  commit messages on `main`. release-please keeps a release PR open with the
+  next version and `CHANGELOG.md` (`fix:` → patch, `feat:` → minor while
+  below 1.0, `feat!:` / `BREAKING CHANGE:` → major). Merging it tags
+  `vX.Y.Z` and creates the GitHub release; GoReleaser then attaches archives
+  for Linux, macOS, Windows and FreeBSD (amd64/arm64), checksums and SBOMs,
+  and pushes `ghcr.io/jvzantvoort/gogalaxy:{X.Y.Z,X.Y,latest}`.
+  Pushing a `v*` tag by hand also produces a release.
+* **Dependabot** keeps Go modules, actions and the base image current.
+
+Container usage:
+
+```sh
+docker run -d -p 8000:8000 -v gogalaxy-data:/data ghcr.io/jvzantvoort/gogalaxy
+docker exec -it <container> gogalaxy user add admin --superuser
+```
+
 ## Storage layout
 
 ```

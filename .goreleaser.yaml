@@ -1,0 +1,90 @@
+# GoReleaser configuration, see https://goreleaser.com
+version: 2
+
+project_name: gogalaxy
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+
+builds:
+  - id: gogalaxy
+    main: .
+    binary: gogalaxy
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/jvzantvoort/gogalaxy/internal/version.Version={{ .Version }}
+      - -X github.com/jvzantvoort/gogalaxy/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/jvzantvoort/gogalaxy/internal/version.Date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos: [linux, darwin, windows, freebsd]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: gogalaxy
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - gogalaxy.example.yaml
+      - LICENSE*
+      - CHANGELOG*
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+
+dockers_v2:
+  - id: gogalaxy
+    ids: [gogalaxy]
+    images:
+      - ghcr.io/jvzantvoort/gogalaxy
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.description: Single binary Ansible Galaxy server
+      org.opencontainers.image.source: "{{ .GitURL }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+    extra_files:
+      - gogalaxy.example.yaml
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next+{{ .ShortCommit }}"
+
+changelog:
+  # Used for manually pushed tags. Releases cut by release-please keep their
+  # notes (see release.mode below).
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^chore\\(main\\): release"
+      - "^docs:"
+      - "^test:"
+
+release:
+  github:
+    owner: jvzantvoort
+    name: gogalaxy
+  # release-please creates the release with its changelog; only add assets.
+  mode: keep-existing
+  prerelease: auto

@@ -347,7 +347,8 @@ func (a *API) importRole(w http.ResponseWriter, r *http.Request) {
 	if limit := a.svc.Cfg.Content.MaxUploadSize; limit > 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, limit+1<<20)
 	}
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	// The body is bounded by MaxBytesReader above; parts beyond 32MiB spill to disk.
+	if err := r.ParseMultipartForm(32 << 20); err != nil { //nolint:gosec // see above
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
 			httpx.JSON(w, http.StatusRequestEntityTooLarge, map[string]string{"detail": "Archive exceeds the maximum upload size."})
@@ -356,7 +357,7 @@ func (a *API) importRole(w http.ResponseWriter, r *http.Request) {
 		httpx.JSON(w, http.StatusBadRequest, map[string]string{"detail": "Invalid multipart upload."})
 		return
 	}
-	defer r.MultipartForm.RemoveAll()
+	defer func() { _ = r.MultipartForm.RemoveAll() }()
 	file, _, err := httpx.FormFile(r, "file")
 	if err != nil {
 		httpx.JSON(w, http.StatusBadRequest, map[string]string{"detail": "No file was submitted."})

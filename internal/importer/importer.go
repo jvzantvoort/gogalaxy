@@ -43,7 +43,8 @@ func walkTarGz(file string, fn func(name string, hdr *tar.Header, r io.Reader) e
 			return fmt.Errorf("archive contains unsafe path %q", hdr.Name)
 		}
 		if hdr.Typeflag == tar.TypeLink || hdr.Typeflag == tar.TypeSymlink {
-			if path.IsAbs(hdr.Linkname) || hasDotDot(path.Join(path.Dir(name), hdr.Linkname)) {
+			// This is the traversal check itself; nothing is extracted.
+			if path.IsAbs(hdr.Linkname) || hasDotDot(path.Join(path.Dir(name), hdr.Linkname)) { //nolint:gosec // see above
 				return fmt.Errorf("archive contains unsafe link %q -> %q", hdr.Name, hdr.Linkname)
 			}
 		}
