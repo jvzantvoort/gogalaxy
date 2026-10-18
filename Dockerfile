@@ -1,7 +1,7 @@
 # Release image, built by GoReleaser (dockers_v2) from the prebuilt binaries:
 # the build context holds <os>/<arch>/gogalaxy for every target platform.
 # For a local image use "make docker".
-FROM alpine:3.22
+FROM alpine:3.24
 
 ARG TARGETPLATFORM
 
