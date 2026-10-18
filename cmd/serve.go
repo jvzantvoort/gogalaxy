@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -45,10 +46,17 @@ var serveCmd = &cobra.Command{
 			Handler:      handler,
 			ReadTimeout:  a.cfg.Server.ReadTimeout,
 			WriteTimeout: a.cfg.Server.WriteTimeout,
+			// Bound slow and idle clients independently of the (long, upload
+			// sized) read timeout so they cannot pin connections.
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       2 * time.Minute,
 		}
 
 		ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
+
+		// Deferred before Shutdown runs, so it flushes once requests have drained.
+		defer a.svc.StartDownloadCounter(10 * time.Second)()
 
 		errc := make(chan error, 1)
 		go func() {

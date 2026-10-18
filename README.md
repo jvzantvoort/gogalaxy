@@ -144,9 +144,12 @@ data/namespaces/<name>.json
 data/repositories/<repo>/<namespace>/<name>/collection.json
 data/repositories/<repo>/<namespace>/<name>/versions/<version>.json
 data/roles/<namespace>/<name>.json
+data/roles/.index/<id>                 (role ID -> namespace/name, rebuilt on demand)
 data/tasks/<id>.json
 data/artifacts/{collections,roles}/<file>.tar.gz
 ```
 
-Writes are atomic and serialised within one process. Running two servers on
+Writes are atomic (temporary file + rename), so reads take no lock; writes
+are serialised within one process. Role download counts are buffered in
+memory and written every 10 seconds and on shutdown. Running two servers on
 the same directory at once is not supported.

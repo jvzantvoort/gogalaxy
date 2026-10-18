@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/jvzantvoort/gogalaxy/internal/auth"
 	"github.com/jvzantvoort/gogalaxy/internal/config"
@@ -59,6 +60,12 @@ type Service struct {
 	Store  storage.Store
 	Policy auth.Authorizer
 	Log    *slog.Logger
+
+	downloads struct {
+		mu       sync.Mutex
+		buffered bool
+		pending  map[[2]string]int64
+	}
 }
 
 // New creates a Service. A nil policy selects auth.DefaultPolicy.

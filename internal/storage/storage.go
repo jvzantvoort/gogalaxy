@@ -92,7 +92,8 @@ type RoleStore interface {
 	// Save creates or updates a role, assigning IDs to the role and to new versions.
 	Save(ctx context.Context, r *model.Role) error
 	Delete(ctx context.Context, namespace, name string) error
-	IncrementDownloads(ctx context.Context, namespace, name string) error
+	// AddDownloads adds n to the download counter of the role.
+	AddDownloads(ctx context.Context, namespace, name string, n int64) error
 }
 
 // TaskStore persists import tasks.

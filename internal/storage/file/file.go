@@ -7,13 +7,16 @@
 //	<path>/repositories/<repo>/<namespace>/<name>/collection.json
 //	<path>/repositories/<repo>/<namespace>/<name>/versions/<version>.json
 //	<path>/roles/<namespace>/<name>.json
+//	<path>/roles/.index/<id>                  (role ID -> "<namespace>/<name>")
 //	<path>/tasks/<id>.json
 //	<path>/artifacts/<kind>/<filename>
 //	<path>/sequences.json
 //
-// Writes are atomic (write to a temporary file, then rename) and serialised
-// within the process. Reads always go to disk, so changes made by CLI
-// commands are visible to a running server immediately.
+// Writes are atomic (write to a temporary file, then rename), so readers
+// always see either the old or the new version of a file and take no lock;
+// writers are serialised within the process to keep read-modify-write cycles
+// (sequences, counters) consistent. Reads always go to disk, so changes made
+// by CLI commands are visible to a running server immediately.
 package file
 
 import (
@@ -39,7 +42,7 @@ func init() { storage.Register(DriverName, New) }
 // Store is the file based storage.Store.
 type Store struct {
 	root string
-	mu   sync.RWMutex
+	mu   sync.Mutex // serialises writers only
 }
 
 // New creates (if needed) and opens a file store at cfg.Path.
@@ -89,8 +92,10 @@ func checkComponent(p string) error {
 	return nil
 }
 
+// readJSON decodes the file at path. Callers build path through Store.path,
+// which validates every component.
 func readJSON(path string, v any) error {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) //nolint:gosec // see above
 	if errors.Is(err, fs.ErrNotExist) {
 		return storage.ErrNotFound
 	}

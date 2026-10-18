@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,8 +19,6 @@ import (
 type collections struct{ s *Store }
 
 func (c collections) ListCollections(_ context.Context, repo string) ([]*model.Collection, error) {
-	c.s.mu.RLock()
-	defer c.s.mu.RUnlock()
 	base, err := c.s.path("repositories", repo)
 	if err != nil {
 		return nil, err
@@ -55,8 +54,6 @@ func (c collections) ListCollections(_ context.Context, repo string) ([]*model.C
 }
 
 func (c collections) GetCollection(_ context.Context, repo, namespace, name string) (*model.Collection, error) {
-	c.s.mu.RLock()
-	defer c.s.mu.RUnlock()
 	p, err := c.s.path("repositories", repo, namespace, name, "collection.json")
 	if err != nil {
 		return nil, storage.ErrNotFound
@@ -82,8 +79,6 @@ func (c collections) UpdateCollection(_ context.Context, repo string, col *model
 }
 
 func (c collections) ListVersions(_ context.Context, repo, namespace, name string) ([]*model.CollectionVersion, error) {
-	c.s.mu.RLock()
-	defer c.s.mu.RUnlock()
 	p, err := c.s.path("repositories", repo, namespace, name, "versions")
 	if err != nil {
 		return nil, storage.ErrNotFound
@@ -98,8 +93,6 @@ func (c collections) ListVersions(_ context.Context, repo, namespace, name strin
 }
 
 func (c collections) GetVersion(_ context.Context, repo, namespace, name, version string) (*model.CollectionVersion, error) {
-	c.s.mu.RLock()
-	defer c.s.mu.RUnlock()
 	p, err := c.s.path("repositories", repo, namespace, name, "versions", version+".json")
 	if err != nil {
 		return nil, storage.ErrNotFound
@@ -164,8 +157,6 @@ func (c collections) DeleteVersion(_ context.Context, repo, namespace, name, ver
 type roles struct{ s *Store }
 
 func (r roles) List(_ context.Context) ([]*model.Role, error) {
-	r.s.mu.RLock()
-	defer r.s.mu.RUnlock()
 	base := filepath.Join(r.s.root, "roles")
 	nss, err := subdirs(base)
 	if err != nil {
@@ -184,8 +175,6 @@ func (r roles) List(_ context.Context) ([]*model.Role, error) {
 }
 
 func (r roles) Get(_ context.Context, namespace, name string) (*model.Role, error) {
-	r.s.mu.RLock()
-	defer r.s.mu.RUnlock()
 	return r.getLocked(namespace, name)
 }
 
@@ -201,17 +190,40 @@ func (r roles) getLocked(namespace, name string) (*model.Role, error) {
 	return &role, nil
 }
 
+func (r roles) indexPath(id int64) string {
+	return filepath.Join(r.s.root, "roles", ".index", strconv.FormatInt(id, 10))
+}
+
 func (r roles) GetByID(ctx context.Context, id int64) (*model.Role, error) {
+	if b, err := os.ReadFile(r.indexPath(id)); err == nil {
+		if ns, name, ok := strings.Cut(string(b), "/"); ok {
+			if role, err := r.getLocked(ns, name); err == nil && role.ID == id {
+				return role, nil
+			}
+		}
+	}
+	// Missing or stale index entry (e.g. roles stored before the index
+	// existed): scan, then repair the entry so the next lookup is direct.
 	all, err := r.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for _, role := range all {
 		if role.ID == id {
+			r.s.mu.Lock()
+			_ = r.writeIndex(role)
+			r.s.mu.Unlock()
 			return role, nil
 		}
 	}
 	return nil, storage.ErrNotFound
+}
+
+func (r roles) writeIndex(role *model.Role) error {
+	return writeAtomic(r.indexPath(role.ID), func(w io.Writer) error {
+		_, err := io.WriteString(w, role.Namespace+"/"+role.Name)
+		return err
+	})
 }
 
 func (r roles) Save(_ context.Context, role *model.Role) error {
@@ -236,7 +248,10 @@ func (r roles) Save(_ context.Context, role *model.Role) error {
 			}
 		}
 	}
-	return writeJSON(p, role)
+	if err := writeJSON(p, role); err != nil {
+		return err
+	}
+	return r.writeIndex(role)
 }
 
 func (r roles) Delete(_ context.Context, namespace, name string) error {
@@ -246,24 +261,28 @@ func (r roles) Delete(_ context.Context, namespace, name string) error {
 	if err != nil {
 		return storage.ErrNotFound
 	}
+	role, _ := r.getLocked(namespace, name)
 	if err := os.Remove(p); err != nil {
 		if os.IsNotExist(err) {
 			return storage.ErrNotFound
 		}
 		return err
 	}
+	if role != nil {
+		_ = os.Remove(r.indexPath(role.ID))
+	}
 	_ = os.Remove(filepath.Dir(p)) // namespace dir, only when empty
 	return nil
 }
 
-func (r roles) IncrementDownloads(_ context.Context, namespace, name string) error {
+func (r roles) AddDownloads(_ context.Context, namespace, name string, n int64) error {
 	r.s.mu.Lock()
 	defer r.s.mu.Unlock()
 	role, err := r.getLocked(namespace, name)
 	if err != nil {
 		return err
 	}
-	role.DownloadCount++
+	role.DownloadCount += n
 	p, _ := r.s.path("roles", namespace, name+".json")
 	return writeJSON(p, role)
 }
@@ -271,8 +290,6 @@ func (r roles) IncrementDownloads(_ context.Context, namespace, name string) err
 type tasks struct{ s *Store }
 
 func (t tasks) Get(_ context.Context, id string) (*model.Task, error) {
-	t.s.mu.RLock()
-	defer t.s.mu.RUnlock()
 	p, err := t.s.path("tasks", id+".json")
 	if err != nil {
 		return nil, storage.ErrNotFound

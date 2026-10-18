@@ -178,6 +178,18 @@ func (s *Service) ListRoles(ctx context.Context, u *model.User, f RoleFilter) ([
 	if err := s.checkRoles(u); err != nil {
 		return nil, err
 	}
+	// Exact lookups (ansible-galaxy role install) read a single file. A miss
+	// falls through to the scan, which also matches the namespace case
+	// insensitively.
+	if f.Namespace != "" && f.Name != "" {
+		r, err := s.Store.Roles().Get(ctx, f.Namespace, f.Name)
+		switch {
+		case err == nil && f.match(r):
+			return []*model.Role{r}, nil
+		case err != nil && !errors.Is(err, storage.ErrNotFound):
+			return nil, err
+		}
+	}
 	all, err := s.Store.Roles().List(ctx)
 	if err != nil {
 		return nil, err
@@ -215,10 +227,72 @@ func (s *Service) GetRoleByID(ctx context.Context, u *model.User, id int64) (*mo
 	return r, err
 }
 
-// CountRoleDownload records an install of the role.
+// CountRoleDownload records an install of the role. While the download
+// counter is started the count is buffered in memory and written in batches, otherwise
+// it is stored right away.
 func (s *Service) CountRoleDownload(ctx context.Context, namespace, name string) {
-	if err := s.Store.Roles().IncrementDownloads(ctx, namespace, name); err != nil {
-		s.Log.Warn("counting role download", "role", namespace+"."+name, "error", err)
+	key := [2]string{namespace, name}
+	s.downloads.mu.Lock()
+	if s.downloads.buffered {
+		if s.downloads.pending == nil {
+			s.downloads.pending = map[[2]string]int64{}
+		}
+		s.downloads.pending[key]++
+		s.downloads.mu.Unlock()
+		return
+	}
+	s.downloads.mu.Unlock()
+	s.addDownloads(ctx, key, 1)
+}
+
+func (s *Service) addDownloads(ctx context.Context, key [2]string, n int64) {
+	if err := s.Store.Roles().AddDownloads(ctx, key[0], key[1], n); err != nil && !errors.Is(err, storage.ErrNotFound) {
+		s.Log.Warn("counting role download", "role", key[0]+"."+key[1], "error", err)
+	}
+}
+
+// FlushDownloads writes buffered download counts to storage.
+func (s *Service) FlushDownloads(ctx context.Context) {
+	s.downloads.mu.Lock()
+	pending := s.downloads.pending
+	s.downloads.pending = nil
+	s.downloads.mu.Unlock()
+	for key, n := range pending {
+		s.addDownloads(ctx, key, n)
+	}
+}
+
+// StartDownloadCounter buffers download counts and flushes them every
+// interval; counting per request would otherwise cost a synchronous disk
+// write on every role install. Buffering is active when it returns. The
+// returned stop function ends buffering and flushes what is pending.
+func (s *Service) StartDownloadCounter(interval time.Duration) (stop func()) {
+	s.downloads.mu.Lock()
+	s.downloads.buffered = true
+	s.downloads.mu.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				s.FlushDownloads(ctx)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return func() {
+		cancel()
+		<-done
+		s.downloads.mu.Lock()
+		s.downloads.buffered = false
+		s.downloads.mu.Unlock()
+		s.FlushDownloads(context.Background())
 	}
 }
 

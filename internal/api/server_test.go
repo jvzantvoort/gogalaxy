@@ -22,6 +22,7 @@ import (
 	"github.com/jvzantvoort/gogalaxy/internal/api"
 	"github.com/jvzantvoort/gogalaxy/internal/auth"
 	"github.com/jvzantvoort/gogalaxy/internal/config"
+	"github.com/jvzantvoort/gogalaxy/internal/model"
 	"github.com/jvzantvoort/gogalaxy/internal/service"
 	"github.com/jvzantvoort/gogalaxy/internal/storage"
 	_ "github.com/jvzantvoort/gogalaxy/internal/storage/file"
@@ -273,6 +274,40 @@ func TestInvalidCredentials(t *testing.T) {
 	}
 }
 
+func TestBasicAuthCacheFollowsPasswordChanges(t *testing.T) {
+	e := newEnv(t, nil)
+	status := func(user, pw string) int {
+		req, _ := http.NewRequest(http.MethodPost, e.srv.URL+"/api/galaxy/v3/auth/token/", nil)
+		req.SetBasicAuth(user, pw)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	for range 2 { // second round is served from the cache
+		if code := status("admin", "pw"); code != http.StatusOK {
+			t.Fatalf("valid password: %d", code)
+		}
+	}
+	if err := e.svc.SetPassword(context.Background(), "admin", "new"); err != nil {
+		t.Fatal(err)
+	}
+	if code := status("admin", "pw"); code != http.StatusUnauthorized {
+		t.Fatalf("old password after change: %d", code)
+	}
+	if code := status("admin", "new"); code != http.StatusOK {
+		t.Fatalf("new password: %d", code)
+	}
+	if _, err := e.svc.UpdateUser(context.Background(), "admin", func(u *model.User) error { u.IsActive = false; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if code := status("admin", "new"); code != http.StatusUnauthorized {
+		t.Fatalf("disabled user: %d", code)
+	}
+}
+
 func TestRoles(t *testing.T) {
 	for _, anon := range []bool{true, false} {
 		t.Run(fmt.Sprintf("anonymous_read=%t", anon), func(t *testing.T) {
@@ -325,6 +360,10 @@ func TestRoles(t *testing.T) {
 				if resp.StatusCode != http.StatusUnauthorized {
 					t.Fatalf("unsigned download: %d", resp.StatusCode)
 				}
+			}
+
+			if r, err := e.svc.Store.Roles().Get(context.Background(), "testns", "web"); err != nil || r.DownloadCount != 1 {
+				t.Fatalf("download count not recorded: %v %+v", err, r)
 			}
 
 			if code, body = e.do("bob", http.MethodDelete, "/api/galaxy/v1/removerole/?github_user=testns&github_repo=web", nil, ""); code != 403 {

@@ -17,8 +17,6 @@ import (
 type users struct{ s *Store }
 
 func (u users) Get(_ context.Context, username string) (*model.User, error) {
-	u.s.mu.RLock()
-	defer u.s.mu.RUnlock()
 	p, err := u.s.path("users", username+".json")
 	if err != nil {
 		return nil, storage.ErrNotFound
@@ -31,8 +29,6 @@ func (u users) Get(_ context.Context, username string) (*model.User, error) {
 }
 
 func (u users) List(_ context.Context) ([]*model.User, error) {
-	u.s.mu.RLock()
-	defer u.s.mu.RUnlock()
 	out, err := listJSON[model.User](filepath.Join(u.s.root, "users"))
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, err
@@ -96,8 +92,6 @@ func hashToken(token string) string {
 }
 
 func (t tokens) Lookup(_ context.Context, token string) (string, error) {
-	t.s.mu.RLock()
-	defer t.s.mu.RUnlock()
 	var rec tokenRecord
 	if err := readJSON(filepath.Join(t.s.root, "tokens", hashToken(token)+".json"), &rec); err != nil {
 		return "", err
@@ -145,8 +139,6 @@ func revokeLocked(s *Store, username string) error {
 type namespaces struct{ s *Store }
 
 func (n namespaces) Get(_ context.Context, name string) (*model.Namespace, error) {
-	n.s.mu.RLock()
-	defer n.s.mu.RUnlock()
 	p, err := n.s.path("namespaces", name+".json")
 	if err != nil {
 		return nil, storage.ErrNotFound
@@ -159,8 +151,6 @@ func (n namespaces) Get(_ context.Context, name string) (*model.Namespace, error
 }
 
 func (n namespaces) List(_ context.Context) ([]*model.Namespace, error) {
-	n.s.mu.RLock()
-	defer n.s.mu.RUnlock()
 	out, err := listJSON[model.Namespace](filepath.Join(n.s.root, "namespaces"))
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, err
