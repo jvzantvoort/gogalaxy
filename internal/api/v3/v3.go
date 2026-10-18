@@ -43,7 +43,9 @@ func (a *API) Routes(r chi.Router) {
 	r.Get("/collections/all/", a.notFound)
 	r.Get("/collection_versions/all/", a.notFound)
 
-	collectionRoutes(r, a)
+	// Legacy paths (<prefix>/v3/collections/...) and pulp_ansible's
+	// distribution paths (.../collections/index/...) share the handlers.
+	r.Route("/collections", func(r chi.Router) { collectionRoutes(r, a) })
 	r.Route("/plugin/ansible/content/{distro}/collections", func(r chi.Router) {
 		r.Route("/index", func(r chi.Router) { collectionRoutes(r, a) })
 		r.Get("/artifacts/{filename}", a.download)
@@ -53,13 +55,13 @@ func (a *API) Routes(r chi.Router) {
 }
 
 func collectionRoutes(r chi.Router, a *API) {
-	r.Get("/collections/", a.listCollections)
-	r.Get("/collections/{namespace}/{name}/", a.getCollection)
-	r.Patch("/collections/{namespace}/{name}/", a.patchCollection)
-	r.Delete("/collections/{namespace}/{name}/", a.deleteCollection)
-	r.Get("/collections/{namespace}/{name}/versions/", a.listVersions)
-	r.Get("/collections/{namespace}/{name}/versions/{version}/", a.getVersion)
-	r.Delete("/collections/{namespace}/{name}/versions/{version}/", a.deleteVersion)
+	r.Get("/", a.listCollections)
+	r.Get("/{namespace}/{name}/", a.getCollection)
+	r.Patch("/{namespace}/{name}/", a.patchCollection)
+	r.Delete("/{namespace}/{name}/", a.deleteCollection)
+	r.Get("/{namespace}/{name}/versions/", a.listVersions)
+	r.Get("/{namespace}/{name}/versions/{version}/", a.getVersion)
+	r.Delete("/{namespace}/{name}/versions/{version}/", a.deleteVersion)
 }
 
 func (a *API) notFound(w http.ResponseWriter, r *http.Request) {

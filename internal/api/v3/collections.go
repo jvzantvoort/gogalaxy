@@ -17,11 +17,11 @@ import (
 
 func (a *API) collectionJSON(repo string, c *model.Collection, versions []*model.CollectionVersion) map[string]any {
 	out := map[string]any{
-		"href":            a.indexHref(repo, "collections", c.Namespace, c.Name),
+		"href":            a.indexHref(repo, c.Namespace, c.Name),
 		"namespace":       c.Namespace,
 		"name":            c.Name,
 		"deprecated":      c.Deprecated,
-		"versions_url":    a.indexHref(repo, "collections", c.Namespace, c.Name, "versions"),
+		"versions_url":    a.indexHref(repo, c.Namespace, c.Name, "versions"),
 		"highest_version": nil,
 		"created_at":      httpx.Time(c.Created),
 		"updated_at":      httpx.Time(c.Modified),
@@ -29,7 +29,7 @@ func (a *API) collectionJSON(repo string, c *model.Collection, versions []*model
 	}
 	if hv := service.HighestVersion(versions); hv != nil {
 		out["highest_version"] = map[string]string{
-			"href":    a.indexHref(repo, "collections", c.Namespace, c.Name, "versions", hv.Version),
+			"href":    a.indexHref(repo, c.Namespace, c.Name, "versions", hv.Version),
 			"version": hv.Version,
 		}
 	}
@@ -39,7 +39,7 @@ func (a *API) collectionJSON(repo string, c *model.Collection, versions []*model
 func (a *API) versionSummaryJSON(repo string, v *model.CollectionVersion) map[string]any {
 	return map[string]any{
 		"version":          v.Version,
-		"href":             a.indexHref(repo, "collections", v.Namespace, v.Name, "versions", v.Version),
+		"href":             a.indexHref(repo, v.Namespace, v.Name, "versions", v.Version),
 		"created_at":       httpx.Time(v.Created),
 		"updated_at":       httpx.Time(v.Modified),
 		"requires_ansible": nullable(v.RequiresAnsible),
@@ -59,7 +59,7 @@ func (a *API) versionJSON(r *http.Request, repo string, v *model.CollectionVersi
 	out["collection"] = map[string]any{
 		"id":   v.Namespace + "." + v.Name,
 		"name": v.Name,
-		"href": a.indexHref(repo, "collections", v.Namespace, v.Name),
+		"href": a.indexHref(repo, v.Namespace, v.Name),
 	}
 	out["download_url"] = download
 	out["name"] = v.Name
@@ -347,7 +347,7 @@ func (a *API) searchItem(repo string, c *model.Collection, v *model.CollectionVe
 			"requires_ansible": nullable(v.RequiresAnsible),
 			"contents":         orEmptyAny(v.Metadata.Contents),
 			"pulp_created":     httpx.Time(v.Created),
-			"pulp_href":        a.indexHref(repo, "collections", v.Namespace, v.Name, "versions", v.Version),
+			"pulp_href":        a.indexHref(repo, v.Namespace, v.Name, "versions", v.Version),
 		},
 		"repository_version": "latest",
 		"namespace_metadata": map[string]any{"name": v.Namespace},

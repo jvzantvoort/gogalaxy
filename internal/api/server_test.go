@@ -178,19 +178,20 @@ func TestCollectionLifecycle(t *testing.T) {
 		t.Fatalf("publish prerelease: %d", code)
 	}
 
-	for _, base := range []string{"/api/galaxy/v3", "/api/galaxy/content/published/v3", "/api/galaxy/v3/plugin/ansible/content/published/collections/index"} {
-		code, body = e.get("", base+"/collections/testns/demo/")
+	for _, base := range []string{"/api/galaxy/v3/collections", "/api/galaxy/content/published/v3/collections",
+		"/api/galaxy/v3/plugin/ansible/content/published/collections/index"} {
+		code, body = e.get("", base+"/testns/demo/")
 		if code != 200 {
 			t.Fatalf("%s collection: %d %v", base, code, body)
 		}
 		if hv := body["highest_version"].(map[string]any); hv["version"] != "1.0.0" {
 			t.Fatalf("%s highest_version = %v (pre-releases must not win)", base, hv)
 		}
-		code, body = e.get("", base+"/collections/testns/demo/versions/?limit=1")
+		code, body = e.get("", base+"/testns/demo/versions/?limit=1")
 		if code != 200 || body["meta"].(map[string]any)["count"] != 2.0 || len(body["data"].([]any)) != 1 {
 			t.Fatalf("%s versions: %d %v", base, code, body)
 		}
-		if next := body["links"].(map[string]any)["next"].(string); !strings.HasPrefix(next, base+"/collections/testns/demo/versions/?") {
+		if next := body["links"].(map[string]any)["next"].(string); !strings.HasPrefix(next, base+"/testns/demo/versions/?") {
 			t.Fatalf("next link %q must be an absolute path", next)
 		}
 	}
@@ -198,6 +199,16 @@ func TestCollectionLifecycle(t *testing.T) {
 	code, body = e.get("", "/api/galaxy/v3/collections/testns/demo/versions/1.0.0/")
 	if code != 200 {
 		t.Fatalf("version: %d", code)
+	}
+	const pulpHref = "/api/galaxy/v3/plugin/ansible/content/published/collections/index/testns/demo/versions/1.0.0/"
+	if body["href"] != pulpHref {
+		t.Fatalf("href = %v, want %s", body["href"], pulpHref)
+	}
+	if code, _ := e.get("", pulpHref); code != 200 {
+		t.Fatalf("href does not resolve: %d", code)
+	}
+	if code, _ := e.get("", "/api/galaxy/v3/collections/all/"); code != 404 {
+		t.Fatalf("collections/all must stay disabled: %d", code)
 	}
 	if body["namespace"].(map[string]any)["name"] != "testns" || body["collection"].(map[string]any)["name"] != "demo" {
 		t.Fatalf("version detail: %v", body)
