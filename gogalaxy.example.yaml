@@ -1,0 +1,51 @@
+# gogalaxy configuration. Copy to ./gogalaxy.yaml, ~/.config/gogalaxy/gogalaxy.yaml
+# or /etc/gogalaxy/gogalaxy.yaml, or pass --config. Every key can also be set
+# through the environment: storage.path -> GOGALAXY_STORAGE_PATH, lists as
+# comma separated values (GOGALAXY_AUTH_BACKENDS=token,basic).
+
+server:
+  listen: ":8000"
+  # External base URL used in absolute links (download_url). When empty it is
+  # derived from the request (Host, X-Forwarded-Proto, X-Forwarded-Host).
+  public_url: ""
+  tls_cert: ""
+  tls_key: ""
+  read_timeout: 5m
+  write_timeout: 5m
+  shutdown_timeout: 15s
+  # Signs role download links when auth.anonymous_read is false. Set it to
+  # keep links valid across restarts; a random key is used when empty.
+  secret_key: ""
+
+api:
+  # galaxy_ng serves its API below /api/galaxy/.
+  prefix: /api/galaxy
+  # galaxy_ng version reported to (authenticated) clients.
+  reported_version: ""
+
+storage:
+  driver: file
+  path: ./data
+
+content:
+  # Collection repositories (galaxy_ng distributions). Each one is reachable
+  # at <prefix>/content/<name>/.
+  repositories: [published]
+  # Served at <prefix>/v3/.
+  default_repository: published
+  # Receives uploads made to <prefix>/v3/artifacts/collections/.
+  upload_repository: published
+  # Create missing namespaces on upload, owned by the uploader.
+  auto_create_namespaces: false
+  max_upload_size: 104857600
+  enable_legacy_roles: true
+
+auth:
+  # Authenticators tried in order.
+  backends: [token, basic]
+  # Allow browsing and downloading without credentials.
+  anonymous_read: true
+
+log:
+  level: info   # debug, info, warn, error
+  format: text  # text or json
