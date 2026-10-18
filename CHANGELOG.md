@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/jvzantvoort/gogalaxy/compare/v0.1.0...v0.1.1) (2026-10-18)
+
+
+### Performance
+
+* remove read locking and per-request disk writes from hot paths ([09bf677](https://github.com/jvzantvoort/gogalaxy/commit/09bf677520a647dc20dbc830ea4c844718c0791e))
+
 ## 0.1.0 (2026-10-18)
 
 
